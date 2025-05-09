@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Voice Chat Assistant</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(to bottom right, #eceff1, #cfd8dc);
+            color: #37474f;
+        }
+
+        .auth-section, .chat-section {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border: 1px solid #e0e0e0;
+        }
+
+        h2 {
+            color: #263238;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        input[type="email"], input[type="password"] {
+            width: calc(100% - 22px);
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #b0bec5;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+
+        input[type="email"]:focus, input[type="password"]:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+            outline: none;
+        }
+
+        button {
+            padding: 12px 25px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .record-btn {
+            display: block;
+            margin: 20px auto 0;
+            padding: 15px 30px;
+            font-size: 18px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.1s;
+        }
+
+        .record-btn.recording {
+            background: #dc3545;
+            animation: pulse 1.2s infinite ease-in-out;
+        }
+
+        .record-btn:not(.recording):hover {
+            background: #218838;
+        }
+         .record-btn:active {
+            transform: scale(0.96);
+        }
+
+        .chat-history {
+            margin: 25px 0;
+            border: 1px solid #d1d9e0;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 350px;
+            max-height: 500px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+        }
+
+        .message {
+            margin: 12px 0;
+            padding: 12px 18px;
+            border-radius: 10px;
+            line-height: 1.5;
+            max-width: 75%;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background: #007bff;
+            color: white;
+            margin-left: auto;
+            margin-right: 10px;
+            border-bottom-right-radius: 0px;
+        }
+
+        .bot-message {
+            background: #e9ecef;
+            color: #212529;
+            margin-right: auto;
+            margin-left: 10px;
+            border-bottom-left-radius: 0px;
+        }
+
+        .user-info {
+            text-align: right;
+            margin-bottom: 15px;
+            color: #546e7a;
+        }
+
+        .user-info button {
+            padding: 8px 15px;
+            font-size: 14px;
+            background-color: #6c757d;
+        }
+        .user-info button:hover {
+            background-color: #5a6268;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); transform: scale(1); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); transform: scale(1.05); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Auth Section -->
+    <div class="auth-section" id="authSection">
+        <h2>Login/Register</h2>
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+        <div>
+            <button onclick="login()">Login</button>
+            <button onclick="register()">Register</button>
+        </div>
+    </div>
+
+    <!-- Chat Section -->
+    <div class="chat-section" style="display: none;" id="chatSection">
+        <div class="user-info">
+            <span id="userEmail"></span> | 
+            Credits: <span id="credits">0</span> | 
+            <button onclick="logout()">Logout</button>
+        </div>
+
+        <div class="chat-history" id="chatHistory"></div>
+
+        <button class="record-btn" id="recordBtn" 
+                onmousedown="startRecording()" 
+                onmouseup="stopRecording()"
+                ontouchstart="startRecording()" 
+                touchend="stopRecording()">
+            Hold to Record
+        </button>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let authToken = null;
+
+        // Audio Context for playback
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        async function login() {
+            const response = await fetch('/token', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `username=${encodeURIComponent(email.value)}&password=${encodeURIComponent(password.value)}`
+            });
+            
+            if(response.ok) {
+                const data = await response.json();
+                authToken = data.access_token;
+                initChat();
+            } else {
+                alert('Login failed');
+            }
+        }
+
+        async function register() {
+            const response = await fetch('/register/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `email=${encodeURIComponent(email.value)}&password=${encodeURIComponent(password.value)}`
+            });
+            if (response.ok) {
+                alert('Registration successful! Please login.');
+            } else {
+                const err = await response.json();
+                alert('Registration failed: ' + err.detail);
+            }
+        }
+
+        function initChat() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('chatSection').style.display = 'block';
+            loadUserInfo();
+        }
+
+        async function loadUserInfo() {
+            const response = await fetch('/me', {
+                headers: {'Authorization': `Bearer ${authToken}`}
+            });
+            const user = await response.json();
+            document.getElementById('userEmail').textContent = user.email;
+            document.getElementById('credits').textContent = user.credits;
+        }
+
+        async function startRecording() {
+            document.getElementById('recordBtn').classList.add('recording');
+            
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.start();
+        }
+
+        async function stopRecording() {
+            document.getElementById('recordBtn').classList.remove('recording');
+            
+            mediaRecorder.stop();
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                audioChunks = [];
+                
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+
+                try {
+                    const response = await fetch('/voice-query', {
+                        method: 'POST',
+                        headers: {'Authorization': `Bearer ${authToken}`},
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    handleResponse(result);
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            };
+        }
+
+        async function handleResponse(response) {
+            // Update credits
+            loadUserInfo();
+
+            // Add messages to chat history
+            addMessage(response.text, 'user');
+            addMessage(response.answer, 'bot');
+            if(response.correction) {
+                addMessage(response.correction, 'bot');
+            }
+
+            // Play audio responses
+            playAudio(response.answer_audio);
+            if(response.correction_audio) {
+                setTimeout(() => playAudio(response.correction_audio), 1000);
+            }
+        }
+
+        function addMessage(text, sender) {
+            const div = document.createElement('div');
+            div.className = `message ${sender}-message`;
+            div.textContent = text;
+            document.getElementById('chatHistory').appendChild(div);
+        }
+
+        function playAudio(hexData) {
+            if(!hexData) return;
+            
+            const bytes = new Uint8Array(hexData.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+            audioContext.decodeAudioData(bytes.buffer).then(buffer => {
+                const source = audioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioContext.destination);
+                source.start(0);
+            });
+        }
+
+        function logout() {
+            authToken = null;
+            location.reload();
+        }
+
+        // Initialize audio context on user gesture
+        document.addEventListener('click', () => {
+            if(audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }, { once: true });
+    </script>
+</body>
+</html>

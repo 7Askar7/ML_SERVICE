@@ -1,0 +1,23 @@
+        global:
+          scrape_interval: 15s
+
+        scrape_configs:
+          # Метрики самого Prometheus
+          - job_name: 'prometheus'
+            static_configs:
+              - targets: ['localhost:9090']
+              
+          # Системные метрики с Node Exporter
+          - job_name: 'node'
+            static_configs:
+              - targets: ['node-exporter:9100']
+
+          # Метрики GPU с DCGM Exporter (раскомментируйте, если нужно)
+          - job_name: 'dcgm'
+            static_configs:
+              - targets: ['dcgm-exporter:9400']
+
+          # Метрики Celery
+          - job_name: 'celery_worker'
+            static_configs:
+              - targets: ['celery-exporter:9808']
