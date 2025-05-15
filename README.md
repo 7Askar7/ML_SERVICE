@@ -99,7 +99,8 @@ docker-compose down -v
 
 Ниже представлена упрощенная схема взаимодействия компонентов системы:
 
-#TODO
+<img width="1318" alt="image" src="https://github.com/user-attachments/assets/340a78ab-73c3-4bd2-b6f0-89dd8bbcd026" />
+
 
 **Описание потока:**
 
